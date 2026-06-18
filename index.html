@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JJsnake game 2.67(special edition)</title>
+    <title>Goofy 67 Snake</title>
     <style>
         * {
             box-sizing: border-box;
@@ -65,47 +65,65 @@
         const ctx = canvas.getContext('2d');
         const scoreEl = document.getElementById('score');
 
-        // --- Web Audio Code Generator (No external files needed!) ---
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // --- Web Audio Code Fix for Phones/Safari ---
+        let audioCtx = null;
 
-        // Funny synth sound when eating food
-        function playEatSound() {
+        // Force initialize audio when user taps the screen
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playEatSound(is67) {
+            if (!audioCtx) return;
             try {
                 let osc = audioCtx.createOscillator();
                 let gain = audioCtx.createGain();
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
                 
-                osc.type = 'triangle'; // Smooth arcade sound
-                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-                // Pitch slide up for funny jump effect
-                osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.15);
-                
-                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.15);
-                
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.15);
+                if (is67) {
+                    // Crazy super funny retro alarm sound for 67
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
+                    gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.3);
+                } else {
+                    // Normal arcade pop sound
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.1);
+                }
             } catch(e) {}
         }
 
-        // Derpy retro sound when game over
         function playGameOverSound() {
+            if (!audioCtx) return;
             try {
                 let osc = audioCtx.createOscillator();
                 let gain = audioCtx.createGain();
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
                 
-                osc.type = 'sawtooth'; // Buzzing funny sound
-                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-                osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.5);
-                
-                gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
-                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.4);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.4);
                 
                 osc.start();
-                osc.stop(audioCtx.currentTime + 0.5);
+                osc.stop(audioCtx.currentTime + 0.4);
             } catch(e) {}
         }
 
@@ -118,13 +136,27 @@
         ];
         
         let radius = 12;       
-        let speed = 6;         
+        let speed = 5;         
         let angle = 0;         
         let targetAngle = 0;   
         let score = 0;
         let isGameOver = false; 
         let growPending = 0;   
-        let waveTimer = 0; // NEW: Used to animate the funny shaking/wobbling movement
+        let waveTimer = 0; 
+        
+        // New features for 67 effect
+        let goofyMemeTimer = 0;    // Tracks how long the snake shakes after eating 67
+        let memeTextTimer = 0;     // Tracks how long the funny pop-up text stays on screen
+        let lastMemeMessage = "";   // Holds the funny english phrase
+
+        // Funny 67 English Phrases
+        const memePhrases = [
+            "BRUH!! 67!!!", 
+            "WHAT THE 67?!!", 
+            "OH MY GOD 67!!", 
+            "67 IS SO GOOFY LMAO", 
+            "SHEESH! 67 POWER!"
+        ];
 
         // Food Attributes
         let food = {
@@ -135,12 +167,19 @@
             type: '🍎'   
         };
 
-        const foodPool = ['🍎', '🍌', '🍓', '🍩', '🍕', '🍇', '🍉', '🥑', '🍔', '🍟', '🍦', '🍰', '67']; // NEW: '67' added into food pool!
+        const foodPool = ['🍎', '🍌', '🍓', '🍩', '🍕', '🍇', '🍉', '🥑', '🍔', '🍟', '67'];
 
         function respawnFood() {
             food.x = Math.random() * (canvas.width - 100) + 50;
             food.y = Math.random() * (canvas.height - 100) + 50;
             food.type = foodPool[Math.floor(Math.random() * foodPool.length)];
+            
+            // MODIFIED: Make 67 collision box a bit bigger since the text size is larger
+            if (food.type === '67') {
+                food.radius = 26; 
+            } else {
+                food.radius = 16;
+            }
         }
 
         respawnFood();
@@ -149,8 +188,16 @@
         function update() {
             if (isGameOver) return; 
 
-            // Increase shaking timer based on speed
-            waveTimer += speed * 0.08;
+            // Count down timers
+            if (goofyMemeTimer > 0) goofyMemeTimer--;
+            if (memeTextTimer > 0) memeTextTimer--;
+
+            // Snake shaking speed increases violently if it ate 67!
+            if (goofyMemeTimer > 0) {
+                waveTimer += speed * 0.4; // SUPER FAST DANCE SHAKE
+            } else {
+                waveTimer += speed * 0.02; // Normal slow trailing movement
+            }
 
             let angleDiff = targetAngle - angle;
             angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
@@ -164,7 +211,7 @@
             // Wall Collision Check
             if (head.x > canvas.width || head.x < 0 || head.y > canvas.height || head.y < 0) {
                 isGameOver = true;
-                playGameOverSound(); // Trigger Game Over Sound
+                playGameOverSound(); 
                 return;
             }
 
@@ -176,14 +223,17 @@
             let distance = Math.sqrt(dx * dx + dy * dy); 
 
             if (distance < radius + food.radius) {
-                // If snake eats '67', give double bonus score for meme effect!
                 if (food.type === '67') {
                     score += 67; 
+                    goofyMemeTimer = 90; // Activating goofy animation for 90 frames (approx 1.5 seconds)
+                    memeTextTimer = 90;  // Display funny text for 1.5 seconds
+                    lastMemeMessage = memePhrases[Math.floor(Math.random() * memePhrases.length)];
+                    playEatSound(true);  // Play special crazy sound
                 } else {
                     score += 10;
+                    playEatSound(false); // Play normal sound
                 }
                 scoreEl.innerText = score.toString().padStart(3, '0');
-                playEatSound(); // Trigger Arcade Sound
                 respawnFood();
                 speed += 0.15; 
                 growPending += 3; 
@@ -202,7 +252,7 @@
                 let sDist = Math.sqrt(sDx * sDx + sDy * sDy);
                 if (sDist < radius * 0.8) {
                     isGameOver = true; 
-                    playGameOverSound(); // Trigger Game Over Sound
+                    playGameOverSound(); 
                     return;
                 }
             }
@@ -218,6 +268,8 @@
             isGameOver = false;
             growPending = 0; 
             waveTimer = 0;
+            goofyMemeTimer = 0;
+            memeTextTimer = 0;
             scoreEl.innerText = "000";
             snake = [
                 {x: 400, y: 300},
@@ -233,17 +285,18 @@
             ctx.fillStyle = '#110e1c'; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 1. Draw Funny Wobbling Cartoon Snake
+            // 1. Draw Snake
             snake.forEach((segment, index) => {
                 ctx.beginPath();
                 
-                // NEW MEME EFFECT: Calculate a dynamic offset to make the body segments wobble like a spring
-                // This creates a hilarious butt-shaking dance movement
-                let wobbleX = Math.sin(waveTimer + index * 0.5) * 5 * Math.sin(angle);
-                let wobbleY = Math.cos(waveTimer + index * 0.5) * 5 * Math.cos(angle);
-                
-                let renderX = segment.x + wobbleX;
-                let renderY = segment.y + wobbleY;
+                let renderX = segment.x;
+                let renderY = segment.y;
+
+                // MODIFIED: Only wobble crazy if goofyMemeTimer is active!
+                if (goofyMemeTimer > 0) {
+                    renderX += Math.sin(waveTimer + index * 0.8) * 12 * Math.sin(angle + Math.PI/2);
+                    renderY += Math.cos(waveTimer + index * 0.8) * 12 * Math.cos(angle + Math.PI/2);
+                }
 
                 if (index === 0) {
                     // Head
@@ -251,10 +304,8 @@
                     ctx.fillStyle = '#4caf50'; 
                     ctx.fill();
 
-                    // Derpy Animated Eyes
+                    // Eyes
                     let eyeOffsetAngle = 0.5; 
-                    
-                    // Left Eye
                     let leftEyeX = renderX + Math.cos(angle - eyeOffsetAngle) * 10;
                     let leftEyeY = renderY + Math.sin(angle - eyeOffsetAngle) * 10;
                     ctx.beginPath();
@@ -262,11 +313,12 @@
                     ctx.fillStyle = '#ffffff';
                     ctx.fill();
                     ctx.beginPath(); 
-                    ctx.arc(leftEyeX, leftEyeY, 3, 0, Math.PI * 2); // Slightly bigger pupil for a goofy stare
+                    // Goofy cross-eyed look when shaking
+                    let pupilOffset = goofyMemeTimer > 0 ? 1 : 2.5;
+                    ctx.arc(leftEyeX, leftEyeY, pupilOffset, 0, Math.PI * 2);
                     ctx.fillStyle = '#000000';
                     ctx.fill();
 
-                    // Right Eye
                     let rightEyeX = renderX + Math.cos(angle + eyeOffsetAngle) * 10;
                     let rightEyeY = renderY + Math.sin(angle + eyeOffsetAngle) * 10;
                     ctx.beginPath();
@@ -274,12 +326,12 @@
                     ctx.fillStyle = '#ffffff';
                     ctx.fill();
                     ctx.beginPath(); 
-                    ctx.arc(rightEyeX, rightEyeY, 3, 0, Math.PI * 2);
+                    ctx.arc(rightEyeX, rightEyeY, pupilOffset, 0, Math.PI * 2);
                     ctx.fillStyle = '#000000';
                     ctx.fill();
 
                 } else {
-                    // Body segments
+                    // Body
                     let bodyRadius = radius * (1 - index / (snake.length + 10));
                     ctx.arc(renderX, renderY, bodyRadius, 0, Math.PI * 2);
                     ctx.fillStyle = index % 2 === 0 ? '#81c784' : '#4caf50';
@@ -287,7 +339,7 @@
                 }
             });
 
-            // 2. Draw Food (Emoji or "67" text)
+            // 2. Draw Food (MODIFIED: Made "67" giant and glowing)
             ctx.save();
             ctx.translate(food.x, food.y);
             let currentScale = food.pulse;
@@ -297,10 +349,9 @@
             ctx.textBaseline = "middle";
             
             if (food.type === '67') {
-                // Glow effect specifically for "67"
-                ctx.font = "bold 38px Impact, sans-serif";
-                ctx.fillStyle = '#ffeb3b'; // Golden text
-                ctx.shadowBlur = 15;
+                ctx.font = "900 55px Impact, sans-serif"; // MODIFIED: Doubled the font size!
+                ctx.fillStyle = '#ffeb3b'; 
+                ctx.shadowBlur = 25; // Super high glow
                 ctx.shadowColor = '#ffeb3b';
                 ctx.fillText(food.type, 0, 0);
             } else {
@@ -308,6 +359,18 @@
                 ctx.fillText(food.type, 0, 0); 
             }
             ctx.restore();
+
+            // NEW EFFECT: Draw flashing funny English texts on screen center
+            if (memeTextTimer > 0) {
+                ctx.save();
+                ctx.fillStyle = memeTextTimer % 4 === 0 ? '#00e5ff' : '#ffea00'; // Rapid flashy colors
+                ctx.font = 'black 36px Impact, Arial Black, sans-serif';
+                ctx.textAlign = 'center';
+                // Add a little floating vibration shake effect to text
+                let textShakeY = Math.sin(Date.now() * 0.05) * 4;
+                ctx.fillText(lastMemeMessage, canvas.width / 2, 100 + textShakeY);
+                ctx.restore();
+            }
 
             // 3. Draw Game Over Menu
             if (isGameOver) {
@@ -332,11 +395,9 @@
             requestAnimationFrame(loop);
         }
 
-        // --- Controls: Keyboard Listener ---
+        // --- Controls ---
         window.addEventListener('keydown', (e) => {
-            // Resume audio context on user gesture (iOS/Safari rules)
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            
+            initAudio(); // Activate sound context
             if (isGameOver) {
                 resetGame();
                 return;
@@ -349,14 +410,11 @@
             }
         });
 
-        // --- Controls: Touch Listener ---
         let touchStartX = 0;
         let touchStartY = 0;
 
         window.addEventListener('touchstart', (e) => {
-            // Resume audio context on user gesture (iOS/Safari rules)
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-
+            initAudio(); // IMPORTANT: This unlocks and fixes the sound for iPad/Phone!
             if (isGameOver) {
                 resetGame();
                 return;
