@@ -51,34 +51,34 @@
             pointer-events: none;
             font-family: monospace;
         }
-        /* NEW: Speed Controller Styles on Top Right */
+        /* Speed Controller Settings - Top Right */
         #speed-controller {
             position: absolute;
             top: 15px;
             right: 15px;
             display: flex;
             gap: 5px;
-            background: rgba(0, 0, 0, 0.4);
-            padding: 5px;
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0,0,0,0.4);
+            padding: 4px;
+            border-radius: 30px;
+            border: 1px solid rgba(255,255,255,0.1);
             z-index: 5;
         }
         .speed-btn {
+            background: none;
+            border: none;
+            color: #aaa;
             padding: 6px 12px;
             font-size: 12px;
             font-weight: bold;
-            color: #ccc;
-            background: transparent;
-            border: none;
-            border-radius: 6px;
+            border-radius: 20px;
             cursor: pointer;
             text-transform: uppercase;
         }
         .speed-btn.active {
-            color: #110e1c;
             background: #ffea00;
-            box-shadow: 0 2px 8px rgba(255, 234, 0, 0.4);
+            color: #110e1c;
+            box-shadow: 0 2px 8px rgba(255,234,0,0.3);
         }
         #start-menu {
             position: absolute;
@@ -103,28 +103,23 @@
             border-radius: 50px;
             cursor: pointer;
             box-shadow: 0 10px 25px rgba(255, 234, 0, 0.4);
-            transition: transform 0.2s;
-        }
-        #play-btn:active {
-            transform: scale(0.95);
         }
     </style>
 </head>
 <body>
 
     <div id="game-container">
+        <div id="speed-controller">
+            <button class="speed-btn" onclick="setSpeedMode('low')">Low</button>
+            <button class="speed-btn active" onclick="setSpeedMode('medium')">Medium</button>
+            <button class="speed-btn" onclick="setSpeedMode('high')">High</button>
+        </div>
+
         <div id="start-menu">
             <button id="play-btn" onclick="startGame()">START GAME</button>
         </div>
         
         <div id="ui-layer">SCORE: <span id="score">000</span></div>
-        
-        <div id="speed-controller">
-            <button class="speed-btn" id="btn-low" onclick="changeSpeedMode('low')">Low</button>
-            <button class="speed-btn active" id="btn-medium" onclick="changeSpeedMode('medium')">Medium</button>
-            <button class="speed-btn" id="btn-high" onclick="changeSpeedMode('high')">High</button>
-        </div>
-
         <canvas id="gameCanvas" width="800" height="600"></canvas>
     </div>
 
@@ -136,6 +131,26 @@
 
         let audioCtx = null;
         let isGameStarted = false; 
+
+        // Speed Configuration
+        let currentSpeedMode = 'medium'; 
+        const speedSettings = { low: 3, medium: 4, high: 6 };
+        let baseSpeed = speedSettings[currentSpeedMode];
+        let speed = baseSpeed;         
+
+        function setSpeedMode(mode) {
+            currentSpeedMode = mode;
+            baseSpeed = speedSettings[mode];
+            // Update speed active buttons styling
+            document.querySelectorAll('.speed-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.innerText.toLowerCase() === mode);
+            });
+            if (!isGameOver) {
+                // Adjust current speed smoothly based on the score multiplier
+                let speedMultiplier = 1 + (score / 400); 
+                speed = baseSpeed * speedMultiplier;
+            }
+        }
 
         function initAudio() {
             if (!audioCtx) {
@@ -153,25 +168,16 @@
                 let osc1 = audioCtx.createOscillator();
                 let osc2 = audioCtx.createOscillator();
                 let gain = audioCtx.createGain();
-                
-                osc1.connect(gain);
-                osc2.connect(gain);
-                gain.connect(audioCtx.destination);
-                
-                osc1.type = 'sawtooth'; 
-                osc2.type = 'square';   
-                
+                osc1.connect(gain); osc2.connect(gain); gain.connect(audioCtx.destination);
+                osc1.type = 'sawtooth'; osc2.type = 'square';   
                 osc1.frequency.setValueAtTime(100, now);
                 osc1.frequency.linearRampToValueAtTime(1500, now + 0.1);
                 osc1.frequency.linearRampToValueAtTime(300, now + 0.3);
-                
                 osc2.frequency.setValueAtTime(300, now);
                 osc2.frequency.linearRampToValueAtTime(1800, now + 0.15);
                 osc2.frequency.linearRampToValueAtTime(50, now + 0.3);
-                
                 gain.gain.setValueAtTime(0.4, now);
                 gain.gain.linearRampToValueAtTime(0, now + 0.3);
-                
                 osc1.start(now); osc2.start(now);
                 osc1.stop(now + 0.3); osc2.stop(now + 0.3);
             } catch(e) {}
@@ -182,16 +188,13 @@
             try {
                 let osc = audioCtx.createOscillator();
                 let gain = audioCtx.createGain();
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                
+                osc.connect(gain); gain.connect(audioCtx.destination);
                 osc.type = 'triangle';
                 osc.frequency.setValueAtTime(400, audioCtx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.08);
                 gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
                 gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.08);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.08);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.08);
             } catch(e) {}
         }
 
@@ -200,17 +203,13 @@
             try {
                 let osc = audioCtx.createOscillator();
                 let gain = audioCtx.createGain();
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                
+                osc.connect(gain); gain.connect(audioCtx.destination);
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(200, audioCtx.currentTime);
                 osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.4);
                 gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
                 gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.4);
-                
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.4);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.4);
             } catch(e) {}
         }
 
@@ -220,11 +219,8 @@
             startMenu.style.display = 'none'; 
         }
 
-        // --- Core Variables ---
-        let snake = [
-            {x: 400, y: 300}, {x: 385, y: 300}, {x: 370, y: 300}, {x: 355, y: 300}
-        ];
-        
+        // --- Core Game Variables ---
+        let snake = [{x: 400, y: 300}, {x: 385, y: 300}, {x: 370, y: 300}, {x: 355, y: 300}];
         let radius = 12;       
         let angle = 0;         
         let targetAngle = 0;   
@@ -235,82 +231,86 @@
         let goofyMemeTimer = 0;    
         let memeTextTimer = 0;     
         let lastMemeMessage = "";   
+        let leaderboardProcessed = false; // Prevents double prompt loop
 
-        // NEW: Multi-speed configuration
-        let speedMode = 'medium'; // Default
-        let baseSpeed = 5.5;      // Tracks the velocity multipliers
-        let speed = 5.5;          // Actual current speed
-
-        const speedConfigs = {
-            low: 3.5,     // Perfect for Phones
-            medium: 5.5,  // Balanced
-            high: 8.0     // Perfect for iPad / Pro players
-        };
-
-        function changeSpeedMode(mode) {
-            initAudio();
-            speedMode = mode;
-            
-            // UI Button Active state switcher
-            document.querySelectorAll('.speed-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById(`btn-${mode}`).classList.add('active');
-            
-            // Calculate speed delta to keep the organic scaling when snake grows
-            let speedBonus = speed - baseSpeed;
-            baseSpeed = speedConfigs[mode];
-            speed = baseSpeed + speedBonus;
-        }
-
-        const memePhrases = [
-            "BRUH!! 67!!!", 
-            "WHAT THE 67?!!", 
-            "OH MY GOD 67!!", 
-            "67 IS SO GOOFY LMAO", 
-            "SHEESH! 67 POWER!"
-        ];
-
+        const memePhrases = ["BRUH!! 67!!!", "WHAT THE 67?!!", "OH MY GOD 67!!", "67 IS SO GOOFY LMAO", "SHEESH! 67 POWER!"];
         let food = { x: 0, y: 0, radius: 16, pulse: 1, type: '🍎' };
         const fruits = ['🍎', '🍌', '🍓', '🍩', '🍕', '🍇', '🍉', '🥑', '🍔', '🍟'];
 
-        // NEW: Smooth uniform probability system for 67 (20% Chance & Anti-clump)
-        let consecutive67Count = 0;
-        let turnsSinceLast67 = 0;
+        // Balanced Probability Pool: 20% (exactly 2 out of 10 items are '67')
+        // Shuffling this ensures an even distribution without awkward long streaks
+        let probabilityBag = [];
+        function refillProbabilityBag() {
+            probabilityBag = ['67', '67', '🍎', '🍌', '🍓', '🍩', '🍕', '🍇', '🍉', '🥑'];
+            // Classic fisher-yates shuffle algorithm
+            for (let i = probabilityBag.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [probabilityBag[i], probabilityBag[j]] = [probabilityBag[j], probabilityBag[i]];
+            }
+        }
+        refillProbabilityBag();
 
         function respawnFood() {
             food.x = Math.random() * (canvas.width - 100) + 50;
             food.y = Math.random() * (canvas.height - 100) + 50;
             
-            let roll = Math.random();
-            let spawn67 = false;
+            if (probabilityBag.length === 0) refillProbabilityBag();
+            let chosenType = probabilityBag.pop();
 
-            // Algorithm to distribute 67 evenly (20% Base rate)
-            if (roll < 0.20) {
-                spawn67 = true;
-            }
-
-            // Anti-clumping rules (Prevents appearing 3 times consecutively)
-            if (spawn67 && consecutive67Count >= 1) {
-                spawn67 = false; // Force cancel if it just spawned last turn
-            }
-            // Anti-drought rule (If 7 turns passed without 67, force spawn it to balance)
-            if (!spawn67 && turnsSinceLast67 >= 7) {
-                spawn67 = true;
-            }
-
-            if (spawn67) {
+            if (chosenType === '67') {
                 food.type = '67';
                 food.radius = 28; 
-                consecutive67Count++;
-                turnsSinceLast67 = 0;
             } else {
                 food.type = fruits[Math.floor(Math.random() * fruits.length)];
                 food.radius = 16;
-                consecutive67Count = 0;
-                turnsSinceLast67++;
             }
         }
 
         respawnFood();
+
+        // --- Unique Local Leaderboard Logic ---
+        function getLeaderboard() {
+            let data = localStorage.getItem('snake67_leaderboard');
+            return data ? JSON.parse(data) : []; // Array of {name, score}
+        }
+
+        function checkAndSaveLeaderboard(finalScore) {
+            if (finalScore <= 0) return;
+            let board = getLeaderboard();
+            
+            // Check if this score is high enough to enter top 5, or if board has space
+            let isTopFive = board.length < 5 || finalScore > board[board.length - 1].score;
+            
+            if (isTopFive) {
+                // Ask user name via browser standard prompt
+                setTimeout(() => {
+                    let name = prompt("NEW HIGH SCORE! Enter your name:");
+                    if (!name) name = "Anonymous";
+                    name = name.trim().substring(0, 10); // cap name at 10 letters
+
+                    // Look if this name already exists in the list (Unique user logic!)
+                    let existingUserIndex = board.findIndex(item => item.name.toLowerCase() === name.toLowerCase());
+
+                    if (existingUserIndex !== -1) {
+                        // If same person played, only overwrite score IF it's higher than their previous score
+                        if (finalScore > board[existingUserIndex].score) {
+                            board[existingUserIndex].score = finalScore;
+                        }
+                    } else {
+                        // Completely new person, push into array
+                        board.push({ name: name, score: finalScore });
+                    }
+
+                    // Sort leaderboard from highest to lowest score
+                    board.sort((a, b) => b.score - a.score);
+                    // Slice array to keep only top 5 entries
+                    board = board.slice(0, 5);
+
+                    localStorage.setItem('snake67_leaderboard', JSON.stringify(board));
+                    leaderboardProcessed = true;
+                }, 500);
+            }
+        }
 
         // --- Core Logic: Update ---
         function update() {
@@ -337,6 +337,7 @@
             if (head.x > canvas.width || head.x < 0 || head.y > canvas.height || head.y < 0) {
                 isGameOver = true;
                 playGameOverSound(); 
+                checkAndSaveLeaderboard(score);
                 return;
             }
 
@@ -359,7 +360,8 @@
                 }
                 scoreEl.innerText = score.toString().padStart(3, '0');
                 respawnFood();
-                speed += 0.12; // Snake gets faster slowly as game goes on
+                // Speed scales relatively based on your setting
+                speed += 0.15; 
                 growPending += 3; 
             }
 
@@ -372,6 +374,7 @@
                 if (sDist < radius * 0.8) {
                     isGameOver = true; 
                     playGameOverSound(); 
+                    checkAndSaveLeaderboard(score);
                     return;
                 }
             }
@@ -387,8 +390,7 @@
             // 1. Draw Snake
             snake.forEach((segment, index) => {
                 ctx.beginPath();
-                let renderX = segment.x;
-                let renderY = segment.y;
+                let renderX = segment.x; let renderY = segment.y;
 
                 if (goofyMemeTimer > 0) {
                     renderX += Math.sin(waveTimer + index * 0.8) * 14 * Math.sin(angle + Math.PI/2);
@@ -396,16 +398,12 @@
                 }
 
                 if (index === 0) {
-                    ctx.arc(renderX, renderY, radius * 1.3, 0, Math.PI * 2); 
-                    ctx.fillStyle = '#4caf50'; 
-                    ctx.fill();
-
+                    ctx.arc(renderX, renderY, radius * 1.3, 0, Math.PI * 2); ctx.fillStyle = '#4caf50'; ctx.fill();
                     let eyeOffsetAngle = 0.5; 
                     let leftEyeX = renderX + Math.cos(angle - eyeOffsetAngle) * 10;
                     let leftEyeY = renderY + Math.sin(angle - eyeOffsetAngle) * 10;
                     ctx.beginPath(); ctx.arc(leftEyeX, leftEyeY, 5, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill();
-                    ctx.beginPath(); 
-                    let pupilOffset = goofyMemeTimer > 0 ? 1 : 2.5;
+                    ctx.beginPath(); let pupilOffset = goofyMemeTimer > 0 ? 1 : 2.5;
                     ctx.arc(leftEyeX, leftEyeY, pupilOffset, 0, Math.PI * 2); ctx.fillStyle = '#000000'; ctx.fill();
 
                     let rightEyeX = renderX + Math.cos(angle + eyeOffsetAngle) * 10;
@@ -415,62 +413,70 @@
                 } else {
                     let bodyRadius = radius * (1 - index / (snake.length + 10));
                     ctx.arc(renderX, renderY, bodyRadius, 0, Math.PI * 2);
-                    ctx.fillStyle = index % 2 === 0 ? '#81c784' : '#4caf50';
-                    ctx.fill();
+                    ctx.fillStyle = index % 2 === 0 ? '#81c784' : '#4caf50'; ctx.fill();
                 }
             });
 
             // 2. Draw Food
             ctx.save();
             ctx.translate(food.x, food.y);
-            let currentScale = food.pulse;
-            ctx.scale(currentScale, currentScale); 
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
+            ctx.scale(food.pulse, food.pulse); 
+            ctx.textAlign = "center"; ctx.textBaseline = "middle";
             
             if (food.type === '67') {
-                ctx.font = "900 60px Impact, sans-serif"; 
-                ctx.fillStyle = '#ffea00'; 
-                ctx.shadowBlur = 30; 
-                ctx.shadowColor = '#ffea00';
+                ctx.font = "900 60px Impact, sans-serif"; ctx.fillStyle = '#ffea00'; 
+                ctx.shadowBlur = 30; ctx.shadowColor = '#ffea00';
                 ctx.fillText(food.type, 0, 0);
             } else {
-                ctx.font = "34px serif";
-                ctx.fillText(food.type, 0, 0); 
+                ctx.font = "34px serif"; ctx.fillText(food.type, 0, 0); 
             }
             ctx.restore();
 
             if (memeTextTimer > 0) {
                 ctx.save();
                 ctx.fillStyle = memeTextTimer % 4 === 0 ? '#00e5ff' : '#ff2a74'; 
-                ctx.font = 'black 38px Impact, Arial Black, sans-serif';
-                ctx.textAlign = 'center';
+                ctx.font = 'black 38px Impact, Arial Black, sans-serif'; ctx.textAlign = 'center';
                 let textShakeY = Math.sin(Date.now() * 0.05) * 6;
                 ctx.fillText(lastMemeMessage, canvas.width / 2, 110 + textShakeY);
                 ctx.restore();
             }
 
-            // 3. Draw Game Over Menu
+            // 3. Draw Game Over Menu + TOP 5 Unique Leaderboard
             if (isGameOver) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#ff2a74';
-                ctx.font = 'bold 45px system-ui'; 
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 30);
+                ctx.font = 'bold 40px system-ui'; ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', canvas.width / 2, 80);
+
+                // Draw Leaderboard title
+                ctx.fillStyle = '#ffea00';
+                ctx.font = 'bold 22px monospace';
+                ctx.fillText('--- TOP 5 LEADERBOARD ---', canvas.width / 2, 160);
+
+                let board = getLeaderboard();
                 ctx.fillStyle = '#ffffff';
-                ctx.font = '16px system-ui'; 
-                ctx.fillText('TAP SCREEN TO RESTART', canvas.width / 2, canvas.height / 2 + 40);
+                ctx.font = '20px monospace';
+                
+                if (board.length === 0) {
+                    ctx.fillText('No high scores yet!', canvas.width / 2, 220);
+                } else {
+                    board.forEach((item, idx) => {
+                        let rankLine = `${idx + 1}. ${item.name.padEnd(12, ' ')} : ${item.score.toString().padStart(3, '0')}`;
+                        ctx.fillText(rankLine, canvas.width / 2, 220 + (idx * 35));
+                    });
+                }
+
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                ctx.font = '14px system-ui'; 
+                ctx.fillText('TAP SCREEN TO RESTART', canvas.width / 2, canvas.height - 50);
             }
         }
 
         function resetGame() {
-            let currentBonus = speed - baseSpeed;
-            baseSpeed = speedConfigs[speedMode];
-            speed = baseSpeed + currentBonus;
-            
-            score = 0; angle = 0; targetAngle = 0; isGameOver = false; growPending = 0; waveTimer = 0; goofyMemeTimer = 0; memeTextTimer = 0;
+            score = 0; 
+            speed = speedSettings[currentSpeedMode]; // Reset based on chosen controller
+            angle = 0; targetAngle = 0; isGameOver = false; growPending = 0; waveTimer = 0; goofyMemeTimer = 0; memeTextTimer = 0; leaderboardProcessed = false;
             scoreEl.innerText = "000";
             snake = [{x: 400, y: 300}, {x: 385, y: 300}, {x: 370, y: 300}, {x: 355, y: 300}];
             respawnFood();
@@ -478,7 +484,7 @@
 
         function loop() { update(); draw(); requestAnimationFrame(loop); }
 
-        // --- Event Listeners ---
+        // --- Controls Controllers ---
         window.addEventListener('keydown', (e) => {
             initAudio(); 
             if (isGameOver) { resetGame(); return; }
@@ -492,17 +498,15 @@
 
         let touchStartX = 0; let touchStartY = 0;
         window.addEventListener('touchstart', (e) => {
+            // Check if user clicked the speed buttons instead of starting game
+            if (e.target.classList.contains('speed-btn')) return;
             initAudio(); 
             if (isGameOver) { resetGame(); return; }
             touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY;
-        }, { passive: true });
+        });
 
         window.addEventListener('touchmove', (e) => {
             if (!touchStartX || !touchStartY || isGameOver || !isGameStarted) return;
-            
-            // Ignore touch controls if dragging near the top-right speed buttons to prevent wrong turns
-            if(touchStartX > window.innerWidth * 0.7 && touchStartY < 80) return;
-
             let touchEndX = e.touches[0].clientX; let touchEndY = e.touches[0].clientY;
             let dx = touchEndX - touchStartX; let dy = touchEndY - touchStartY;
             if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
