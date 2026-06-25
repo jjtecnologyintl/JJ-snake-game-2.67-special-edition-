@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title> JJ snake game 2.67(special edition)</title>
+    <title>JJ 67 Snake Game</title>
     <style>
         * {
             box-sizing: border-box;
@@ -44,14 +44,16 @@
             position: absolute;
             top: 15px;
             left: 15px;
-            font-size: 20px; 
+            font-size: 16px; 
             font-weight: 800;
             letter-spacing: 1px;
             text-shadow: 0 4px 8px rgba(0,0,0,0.5);
             pointer-events: none;
             font-family: monospace;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
         }
-        /* NEW: Speed Control Buttons on Top Right */
         #speed-controller {
             position: absolute;
             top: 15px;
@@ -62,7 +64,7 @@
         }
         .speed-btn {
             padding: 6px 12px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
             color: #fff;
             background: rgba(255, 255, 255, 0.1);
@@ -114,7 +116,11 @@
             <button id="play-btn" onclick="startGame()">START GAME</button>
         </div>
         
-        <div id="ui-layer">SCORE: <span id="score">000</span></div>
+        <div id="ui-layer">
+            <div>SCORE: <span id="score">000</span></div>
+            <div style="color: #ff2a74; font-size: 14px;">BEST: <span id="high-score">000</span></div>
+            <div id="food-counter" style="color: #00e5ff; font-size: 12px; margin-top: 5px;">EATEN: 0</div>
+        </div>
         
         <div id="speed-controller">
             <button id="btn-low" class="speed-btn" onclick="changeSpeedSetting('LOW')">LOW</button>
@@ -129,18 +135,22 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreEl = document.getElementById('score');
+        const highScoreEl = document.getElementById('high-score');
+        const foodCounterEl = document.getElementById('food-counter');
         const startMenu = document.getElementById('start-menu');
 
         let audioCtx = null;
         let isGameStarted = false; 
 
-        // Speed settings configs
-        const SPEED_MODIFIERS = {
-            'LOW': 4,
-            'MED': 6.5,
-            'HIGH': 9
-        };
+        const SPEED_MODIFIERS = { 'LOW': 3, 'MED': 4.5, 'HIGH': 6 };
         let currentSpeedSetting = 'MED';
+
+        // 皮肤逻辑：由代码根据单局食物数自动强制换色，不给玩家按钮选择
+        let currentSkin = 'CLASSIC';
+        let totalFoodEatenThisSession = 0; 
+
+        let savedHighScore = localStorage.getItem('snake_67_high') || 0;
+        highScoreEl.innerText = savedHighScore.toString().padStart(3, '0');
 
         function initAudio() {
             if (!audioCtx) {
@@ -158,29 +168,16 @@
                 let osc1 = audioCtx.createOscillator();
                 let osc2 = audioCtx.createOscillator();
                 let gain = audioCtx.createGain();
-                
-                osc1.connect(gain);
-                osc2.connect(gain);
-                gain.connect(audioCtx.destination);
-                
-                osc1.type = 'sawtooth'; 
-                osc2.type = 'square';   
-                
+                osc1.connect(gain); osc2.connect(gain); gain.connect(audioCtx.destination);
+                osc1.type = 'sawtooth'; osc2.type = 'square';   
                 osc1.frequency.setValueAtTime(100, now);
                 osc1.frequency.linearRampToValueAtTime(1500, now + 0.1);
                 osc1.frequency.linearRampToValueAtTime(300, now + 0.3);
-                
                 osc2.frequency.setValueAtTime(300, now);
                 osc2.frequency.linearRampToValueAtTime(1800, now + 0.15);
                 osc2.frequency.linearRampToValueAtTime(50, now + 0.3);
-                
-                gain.gain.setValueAtTime(0.4, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.3);
-                
-                osc1.start(now);
-                osc2.start(now);
-                osc1.stop(now + 0.3);
-                osc2.stop(now + 0.3);
+                gain.gain.setValueAtTime(0.4, now); gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc1.start(now); osc2.start(now); osc1.stop(now + 0.3); osc2.stop(now + 0.3);
             } catch(e) {}
         }
 
@@ -189,16 +186,12 @@
             try {
                 let osc = audioCtx.createOscillator();
                 let gain = audioCtx.createGain();
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                
+                osc.connect(gain); gain.connect(audioCtx.destination);
                 osc.type = 'triangle';
                 osc.frequency.setValueAtTime(400, audioCtx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.08);
-                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.08);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.08);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.08);
             } catch(e) {}
         }
 
@@ -207,17 +200,12 @@
             try {
                 let osc = audioCtx.createOscillator();
                 let gain = audioCtx.createGain();
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                
+                osc.connect(gain); gain.connect(audioCtx.destination);
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(200, audioCtx.currentTime);
                 osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.4);
-                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.4);
-                
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.4);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.4);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.4);
             } catch(e) {}
         }
 
@@ -227,23 +215,30 @@
             startMenu.style.display = 'none'; 
         }
 
-        // NEW: Function to toggle speeds
         function changeSpeedSetting(newSetting) {
             currentSpeedSetting = newSetting;
             speed = SPEED_MODIFIERS[newSetting];
-            
-            // Update Active UI Button States
             document.querySelectorAll('.speed-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`btn-${newSetting.toLowerCase()}`).classList.add('active');
         }
 
+        // 核心改动：单局吃到数量，由系统直接强制进化换皮
+        function updateSkinUnlocks() {
+            foodCounterEl.innerText = `EATEN: ${totalFoodEatenThisSession}`;
+            
+            if (totalFoodEatenThisSession >= 16) {
+                currentSkin = 'GOLD'; // 强制变金
+            } else if (totalFoodEatenThisSession >= 8) {
+                currentSkin = 'BLUE'; // 强制变蓝
+            } else {
+                currentSkin = 'CLASSIC'; // 默认绿
+            }
+        }
+
         // --- Core Variables ---
-        let snake = [
-            {x: 400, y: 300}, {x: 385, y: 300}, {x: 370, y: 300}, {x: 355, y: 300}
-        ];
-        
+        let snake = [{x: 400, y: 300}, {x: 385, y: 300}, {x: 370, y: 300}, {x: 355, y: 300}];
         let radius = 12;       
-        let speed = SPEED_MODIFIERS['MED']; // Default speed         
+        let speed = SPEED_MODIFIERS['MED'];         
         let angle = 0;         
         let targetAngle = 0;   
         let score = 0;
@@ -253,35 +248,24 @@
         let goofyMemeTimer = 0;    
         let memeTextTimer = 0;     
         let lastMemeMessage = "";   
-
-        // Smooth Probability Engine Tracker
         let consecutiveNon67Count = 0; 
 
-        const memePhrases = [
-            "BRUH!! 67!!!", 
-            "WHAT THE 67?!!", 
-            "OH MY GOD 67!!", 
-            "67 IS SO GOOFY LMAO", 
-            "SHEESH! 67 POWER!"
-        ];
-
+        const memePhrases = ["BRUH!! 67!!!", "WHAT THE 67?!!", "OH MY GOD 67!!", "67 IS SO GOOFY LMAO", "SHEESH! 67 POWER!"];
         let food = { x: 0, y: 0, radius: 16, pulse: 1, type: '🍎' };
-        const fruits = ['🍎', '🍌', '🍕', '🍇', '🍉', '🥑', '🍟'];
+        const fruits = ['🍎', '🍌', '🍓', '🍩', '🍕', '🍇', '🍉', '🥑', '🍔', '🍟'];
 
         function respawnFood() {
             food.x = Math.random() * (canvas.width - 100) + 50;
             food.y = Math.random() * (canvas.height - 100) + 50;
             
-            // NEW BALANCED ALGORITHM: Base chance is 20%. 
-            // If it hasn't appeared for 4 times, we boost chance. If it just appeared, we nerf chance.
             let dynamicChance = 0.20; 
-            if (consecutiveNon67Count > 4) dynamicChance = 0.50; // Force it to show soon
-            if (consecutiveNon67Count === 0) dynamicChance = 0.05; // Prevent back-to-back spamming
+            if (consecutiveNon67Count > 4) dynamicChance = 0.50; 
+            if (consecutiveNon67Count === 0) dynamicChance = 0.05; 
 
             if (Math.random() < dynamicChance) {
                 food.type = '67';
                 food.radius = 28; 
-                consecutiveNon67Count = 0; // Reset counter
+                consecutiveNon67Count = 0; 
             } else {
                 food.type = fruits[Math.floor(Math.random() * fruits.length)];
                 food.radius = 16;
@@ -326,6 +310,9 @@
             let distance = Math.sqrt(dx * dx + dy * dy); 
 
             if (distance < radius + food.radius) {
+                totalFoodEatenThisSession++; // 单局递增
+                updateSkinUnlocks();
+
                 if (food.type === '67') {
                     score += 67; 
                     goofyMemeTimer = 90; 
@@ -336,9 +323,16 @@
                     score += 10;
                     playEatSound(); 
                 }
+                
                 scoreEl.innerText = score.toString().padStart(3, '0');
+
+                if (score > savedHighScore) {
+                    savedHighScore = score;
+                    localStorage.setItem('snake_67_high', savedHighScore);
+                    highScoreEl.innerText = savedHighScore.toString().padStart(3, '0');
+                }
+
                 respawnFood();
-                // Slowly increase speed but keep it relative to chosen mode
                 speed += 0.12; 
                 growPending += 3; 
             }
@@ -361,7 +355,12 @@
 
         // --- Core Logic: Draw ---
         function draw() {
-            ctx.fillStyle = '#110e1c'; 
+            if (goofyMemeTimer > 0) {
+                let hue = (Date.now() * 0.3) % 360;
+                ctx.fillStyle = `hsla(${hue}, 85%, 15%, 1)`; 
+            } else {
+                ctx.fillStyle = '#110e1c'; 
+            }
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // 1. Draw Snake
@@ -377,7 +376,11 @@
 
                 if (index === 0) {
                     ctx.arc(renderX, renderY, radius * 1.3, 0, Math.PI * 2); 
-                    ctx.fillStyle = '#4caf50'; 
+                    
+                    if (currentSkin === 'BLUE') ctx.fillStyle = '#00b0ff';
+                    else if (currentSkin === 'GOLD') ctx.fillStyle = '#ffd700';
+                    else ctx.fillStyle = '#4caf50'; 
+                    
                     ctx.fill();
 
                     let eyeOffsetAngle = 0.5; 
@@ -395,7 +398,15 @@
                 } else {
                     let bodyRadius = radius * (1 - index / (snake.length + 10));
                     ctx.arc(renderX, renderY, bodyRadius, 0, Math.PI * 2);
-                    ctx.fillStyle = index % 2 === 0 ? '#81c784' : '#4caf50';
+                    
+                    if (currentSkin === 'BLUE') {
+                        ctx.fillStyle = index % 2 === 0 ? '#80d8ff' : '#00b0ff';
+                    } else if (currentSkin === 'GOLD') {
+                        ctx.fillStyle = index % 2 === 0 ? '#fff59d' : '#ffd700';
+                    } else {
+                        ctx.fillStyle = index % 2 === 0 ? '#81c784' : '#4caf50'; 
+                    }
+                    
                     ctx.fill();
                 }
             });
@@ -430,7 +441,6 @@
                 ctx.restore();
             }
 
-            // 3. Draw Game Over Menu
             if (isGameOver) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -447,7 +457,11 @@
 
         function resetGame() {
             score = 0; 
-            // Reset to current selected speed mode base
+            // NEW: 每一场死掉之后，食物计数立刻清零，皮肤回归绿色
+            totalFoodEatenThisSession = 0;
+            currentSkin = 'CLASSIC';
+            foodCounterEl.innerText = "EATEN: 0";
+
             speed = SPEED_MODIFIERS[currentSpeedSetting]; 
             angle = 0; targetAngle = 0; isGameOver = false; growPending = 0; waveTimer = 0; goofyMemeTimer = 0; memeTextTimer = 0;
             scoreEl.innerText = "000";
